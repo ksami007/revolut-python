@@ -85,8 +85,40 @@ Date-time,Description,Amount,Currency
 10/12/2019 23:51:02,Tiptapp Reservation,-250.0,SEK
 ```
 
+## Containerization using Docker
+In order to run Revolutbot in a container you should do the following few steps.
+
+#### Pre-requirements
+Install docker and docker-compose by following official documentation [Docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/).
+
+#### Setup environmental variables
+Create or edit `.env` file in the root of the project to contain the following settings:
+```bash
+REVOLUT_TOKEN=<YOUR-TOKEN-HERE>
+```
+
+#### Setup revolutbot configurations
+Use `revolutbot_config.yml` to tune your trading bot the way you like it. **Note** that you will need to provide valid information regarding your last transaction in the `revolutbot_exchange_history.csv` file.
+
+#### Build image
+From the project root directory run:
+```bash
+docker-compose up -d
+```
+This will build and run the container
+
+#### Userful commands
+You can you the following useful commands from the root directory:
+- Start/Stop/Restart: `docker-compose start/stop/restart`
+- Status: `docker-compose ps`
+- Logs: `docker-compose logs -f`
+- Shell access: `docker-compose exec revolutbot bash`
+
+
 ## TODO
 
 - [ ] Document revolutbot.py
-- [ ] Create a RaspberryPi Dockerfile for revolutbot (to check if rates grows very often)
+- [ ] RaspberryPi docker image
+  - [x] Setup docker image to trade
+  - [ ] Check if rates grows very often
 - [ ] Improve coverage for revolutbot

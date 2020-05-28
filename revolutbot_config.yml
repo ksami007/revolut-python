@@ -1,0 +1,7 @@
+cli_device_id: 'revolut_cli'
+force_exchange: False
+history_file: 'revolutbot_exchange_history.csv'
+log_level: INFO
+percent_margin: 1
+repeat_every_min: 5
+simulate: True
