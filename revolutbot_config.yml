@@ -1,7 +1,20 @@
+# Bot settings
 cli_device_id: 'revolut_cli'
+
+# Force the exchange, ignoring the bot decision (you may lose money)
 force_exchange: False
+
+# csv file with the exchange history
 history_file: 'revolutbot_exchange_history.csv'
+
+# Generic python log level
 log_level: INFO
+
+# Min percent of benefit to exchange
 percent_margin: 1
+
+# Periodicity how often to run the bot
 repeat_every_min: 5
+
+# Do the simulation instead of really exchanging your money
 simulate: True
