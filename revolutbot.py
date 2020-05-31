@@ -87,14 +87,14 @@ def to_buy_or_not_to_buy(
             percent_margin=percent_margin
         )
         logging.info(
-            f'Minimum value to buy: '
+            f'Minimum value to sell yours {last_tr.to_amount.currency}: '
             f'{last_sell} + {percent_margin}% '
             f'of margin is {last_sell_plus_margin}'
         )
         buy_condition = current_balance_in_other_currency.real_amount > \
             last_sell_plus_margin.real_amount
 
-        simulate_str = '(simulating)' if simulate else ''
+        simulate_str = '| simulating' if simulate else ''
         if buy_condition or forceexchange:
             if forceexchange:
                 logging.info('[ATTENTION] Force exchange option enabled')
@@ -102,7 +102,7 @@ def to_buy_or_not_to_buy(
                 logging.info(
                     f'Action: '
                     f'{current_balance_in_other_currency} > {last_sell_plus_margin} '
-                    f'====> BUYING{simulate_str}'
+                    f'====> SELLING your {last_tr.to_amount.currency} {simulate_str}'
                 )
 
             if not simulate:
@@ -123,7 +123,7 @@ def to_buy_or_not_to_buy(
             logging.info(
                 f'Action: '
                 f'{current_balance_in_other_currency} < {last_sell_plus_margin} '
-                f'====> NOT BUYING{simulate_str}'
+                f'====> NOT SELLING your {last_tr.to_amount.currency} {simulate_str}'
             )
         logging.info(f'Sleeping for {repeat_every_min} minutes\n\n')
         time.sleep(repeat_every_min*60)

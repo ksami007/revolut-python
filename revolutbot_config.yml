@@ -14,7 +14,7 @@ log_level: INFO
 percent_margin: 1
 
 # Periodicity how often to run the bot
-repeat_every_min: 5
+repeat_every_min: 15
 
 # Do the simulation instead of really exchanging your money
 simulate: True
