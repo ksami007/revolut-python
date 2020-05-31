@@ -114,7 +114,7 @@ def to_buy_or_not_to_buy(
                 f'{current_balance_in_other_currency} < {last_sell_plus_margin}'
             )
             logging.info('=> DO NOT BUY')
-        logging.info(f'Sleeping {repeat_every_min} minutes')
+        logging.info(f'Sleeping {repeat_every_min} minutes\n\n')
         time.sleep(repeat_every_min*60)
 
 
