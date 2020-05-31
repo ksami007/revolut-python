@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+
 import revolut_bot
-import sys
 import yaml
 import logging
 import os
 import time
 
 from revolut import Revolut
+from revolut import _DATETIME_FORMAT
 
 
 CONFIG_FILE = 'revolutbot_config.yml'
@@ -58,18 +60,22 @@ def to_buy_or_not_to_buy(
             filename=filename
         )
         last_tr = last_transactions[-1]  # The last transaction
-        logging.info(f'Last transaction : {last_tr}')
+        logging.info(
+            f'Last transaction({last_tr.date.strftime(_DATETIME_FORMAT)}): '
+            f'Purchased {last_tr.to_amount} '
+            f'for {last_tr.from_amount}'
+        )
         previous_currency = last_tr.from_amount.currency
 
-        current_balance = last_tr.to_amount  # How much we currently have
-
+        # How much we currently have
+        current_balance = last_tr.to_amount
         current_balance_in_other_currency = revolut_client.quote(
             from_amount=current_balance,
             to_currency=previous_currency
         )
         logging.info(
-            f'Today : {current_balance} in '
-            f'{previous_currency} : {current_balance_in_other_currency}'
+            f'Now({datetime.now().strftime(_DATETIME_FORMAT)}): '
+            f'Your {current_balance} is worth {current_balance_in_other_currency}'
         )
 
         last_sell = last_tr.from_amount  # How much did it cost before selling
@@ -78,43 +84,45 @@ def to_buy_or_not_to_buy(
             percent_margin=percent_margin
         )
         logging.info(
-            f'Min value to buy : {last_sell} + {percent_margin}% '
-            f'(margin) = {last_sell_plus_margin}'
+            f'Minimum value to buy: '
+            f'{last_sell} + {percent_margin}% '
+            f'of margin is {last_sell_plus_margin}'
         )
         buy_condition = current_balance_in_other_currency.real_amount > \
             last_sell_plus_margin.real_amount
 
+        simulate_str = '(simulating)' if simulate else ''
         if buy_condition or forceexchange:
-            if buy_condition:
-                logging.info(
-                    f'{current_balance_in_other_currency} > {last_sell_plus_margin}'
-                )
-            elif forceexchange:
+            if forceexchange:
                 logging.info('[ATTENTION] Force exchange option enabled')
-            logging.info('=> BUY')
-
-            if simulate:
-                logging.info('Simulation mode: do not really buy')
             else:
+                logging.info(
+                    f'Action: '
+                    f'{current_balance_in_other_currency} > {last_sell_plus_margin} '
+                    f'====> BUYING{simulate_str}'
+                )
+
+            if not simulate:
                 exchange_transaction = revolut_client.exchange(
                     from_amount=current_balance,
                     to_currency=previous_currency,
                     simulate=simulate
                 )
                 logging.info(
-                    f'{exchange_transaction.to_amount.real_amount} bought'
+                    f'Result: Just bought {exchange_transaction.to_amount.real_amount}. '
+                    f'Updating history file : {filename}'
                 )
-                logging.info(f'Update history file : {filename}')
                 revolut_bot.update_historyfile(
                     filename=filename,
                     exchange_transaction=exchange_transaction
                 )
         else:
             logging.info(
-                f'{current_balance_in_other_currency} < {last_sell_plus_margin}'
+                f'Action: '
+                f'{current_balance_in_other_currency} < {last_sell_plus_margin} '
+                f'====> NOT BUYING{simulate_str}'
             )
-            logging.info('=> DO NOT BUY')
-        logging.info(f'Sleeping {repeat_every_min} minutes\n\n')
+        logging.info(f'Sleeping for {repeat_every_min} minutes\n\n')
         time.sleep(repeat_every_min*60)
 
 

@@ -20,13 +20,16 @@ _URL_GET_TOKEN_STEP2 = "https://api.revolut.com/signin/confirm"
 
 _DEFAULT_TOKEN_FOR_SIGNIN = "QXBwOlM5V1VuU0ZCeTY3Z1dhbjc="
 
-_AVAILABLE_CURRENCIES = ["USD", "RON", "HUF", "CZK", "GBP", "CAD", "THB",
-                         "SGD", "CHF", "AUD", "ILS", "DKK", "PLN", "MAD",
-                         "AED", "EUR", "JPY", "ZAR", "NZD", "HKD", "TRY",
-                         "QAR", "NOK", "SEK", "BTC", "ETH", "XRP", "BCH",
-                         "LTC", "SAR", "RUB", "RSD", "MXN", "ISK", "HRK",
-                         "BGN", "XAU", "IDR", "INR", "MYR", "PHP"]
+_AVAILABLE_CURRENCIES = [
+    "USD", "RON", "HUF", "CZK", "GBP", "CAD", "THB",
+    "SGD", "CHF", "AUD", "ILS", "DKK", "PLN", "MAD",
+    "AED", "EUR", "JPY", "ZAR", "NZD", "HKD", "TRY",
+    "QAR", "NOK", "SEK", "BTC", "ETH", "XRP", "BCH",
+    "LTC", "SAR", "RUB", "RSD", "MXN", "ISK", "HRK",
+    "BGN", "XAU", "IDR", "INR", "MYR", "PHP"
+]
 
+_DATETIME_FORMAT = "%d/%m/%Y %H:%M:%S"
 _VAULT_ACCOUNT_TYPE = "SAVINGS"
 _ACTIVE_ACCOUNT = "ACTIVE"
 _TRANSACTION_COMPLETED = "COMPLETED"
@@ -40,13 +43,13 @@ _TRANSACTION_DECLINED = "DECLINED"
 # They apply a scale factor depending on the currency
 _DEFAULT_SCALE_FACTOR = 100
 _SCALE_FACTOR_CURRENCY_DICT = {
-                                "EUR": 100,
-                                "BTC": 100000000,
-                                "ETH": 100000000,
-                                "BCH": 100000000,
-                                "XRP": 100000000,
-                                "LTC": 100000000,
-                               }
+    "EUR": 100,
+    "BTC": 100000000,
+    "ETH": 100000000,
+    "BCH": 100000000,
+    "XRP": 100000000,
+    "LTC": 100000000,
+}
 
 
 class Amount:
@@ -123,7 +126,7 @@ class Transaction:
         self.date = date
 
     def __str__(self):
-        return('({}) {} => {}'.format(self.date.strftime("%d/%m/%Y %H:%M:%S"),
+        return('({}) {} => {}'.format(self.date.strftime(_DATETIME_FORMAT),
                                       self.from_amount,
                                       self.to_amount))
 
@@ -357,16 +360,16 @@ class Accounts:
 class AccountTransaction:
     """ Class to handle an account transaction """
     def __init__(
-            self,
-            transactions_type,
-            state,
-            started_date,
-            completed_date,
-            amount,
-            fee,
-            description,
-            account_id
-        ):
+        self,
+        transactions_type,
+        state,
+        started_date,
+        completed_date,
+        amount,
+        fee,
+        description,
+        account_id
+    ):
         self.transactions_type = transactions_type
         self.state = state
         self.started_date = started_date
@@ -382,11 +385,11 @@ class AccountTransaction:
             amount=str(self.amount)
         )
 
-    def get_datetime__str(self, date_format="%d/%m/%Y %H:%M:%S"):
+    def get_datetime__str(self, date_format=_DATETIME_FORMAT):
         """ 'Pending' transactions do not have 'completed_date' yet
         so return 'started_date' instead """
         timestamp = self.completed_date if self.completed_date \
-                else self.started_date
+            else self.started_date
         # Convert from timestamp to datetime
         dt = datetime.fromtimestamp(
             timestamp / 1000
@@ -433,7 +436,7 @@ class AccountTransactions:
         lang_is_fr = lang == "fr"
         if lang_is_fr:
             csv_str = "Date-heure (DD/MM/YYYY HH:MM:ss);Description;Montant;Devise"
-            date_format = "%d/%m/%Y %H:%M:%S"
+            date_format = _DATETIME_FORMAT
         else:
             csv_str = "Date-time (MM/DD/YYYY HH:MM:ss),Description,Amount,Currency"
             date_format = "%m/%d/%Y %H:%M:%S"
@@ -446,11 +449,10 @@ class AccountTransactions:
         transaction_list = list(reversed(self.list)) if reverse else self.list
         for account_transaction in transaction_list:
             if account_transaction.state not in [
-                    _TRANSACTION_DECLINED,
-                    _TRANSACTION_FAILED,
-                    _TRANSACTION_REVERTED
-                ]:
-
+                _TRANSACTION_DECLINED,
+                _TRANSACTION_FAILED,
+                _TRANSACTION_REVERTED
+            ]:
                 csv_str += "\n" + delimiter.join((
                     account_transaction.get_datetime__str(date_format),
                     account_transaction.get_description(),
