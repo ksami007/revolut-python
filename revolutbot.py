@@ -27,7 +27,10 @@ def main():
         config = yaml.load(config_file, Loader=yaml.FullLoader)
 
     # Set logging level
-    logging.basicConfig(level=config.get('log_level', 'INFO'))
+    logging.basicConfig(
+        level=config.get('log_level', 'INFO'),
+        format='%(levelname)s - %(message)s'
+    )
 
     revolut_client = Revolut(device_id=config['cli_device_id'], token=token)
 
