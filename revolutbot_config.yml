@@ -10,6 +10,9 @@ history_file: 'revolutbot_exchange_history.csv'
 # Generic python log level
 log_level: INFO
 
+# Main currency
+main_currency: SEK
+
 # Min percent of benefit to exchange
 percent_margin: 1
 

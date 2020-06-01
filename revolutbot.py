@@ -37,78 +37,116 @@ def main():
     simulate = config['simulate']
     filename = config['history_file']
     forceexchange = config['force_exchange']
+    main_currency = config['main_currency']
     percent_margin = config['percent_margin']
     repeat_every_min = config['repeat_every_min']
-    to_buy_or_not_to_buy(
+    trade(
         revolut_client,
         simulate,
         filename,
+        main_currency,
         forceexchange,
         percent_margin,
         repeat_every_min
     )
 
 
-def to_buy_or_not_to_buy(
+def trade(
     revolut_client,
     simulate,
     filename,
+    main_currency,
     forceexchange,
     percent_margin,
     repeat_every_min
 ):
+    """
+    Continuously monitor the stock/commodity price.
+    Two possible scenarios:
+    If during last transaction you have sold commodity - monitor for cheaper offer to buy more;
+    If during last transaction you bought commodity - monitor for higher offer to sell it.
+    """
 
     while True:
         last_transactions = revolut_bot.get_last_transactions_from_csv(
             filename=filename
         )
         last_tr = last_transactions[-1]  # The last transaction
-        logging.info(
-            f'Last transaction({last_tr.date.strftime(_DATETIME_FORMAT)}): '
-            f'Purchased {last_tr.to_amount} '
-            f'for {last_tr.from_amount}'
-        )
-        previous_currency = last_tr.from_amount.currency
+        from_currency = last_tr.from_amount.currency
+        to_currency = last_tr.to_amount.currency
 
-        # How much we currently have
-        current_balance = last_tr.to_amount
-        current_balance_in_other_currency = revolut_client.quote(
-            from_amount=current_balance,
-            to_currency=previous_currency
-        )
+        if to_currency != main_currency:
+            logging.info(
+                f'Last transaction({last_tr.date.strftime(_DATETIME_FORMAT)}): '
+                f'Bought {last_tr.to_amount} '
+                f'for {last_tr.from_amount}'
+            )
+            action = 'sell'
+            currency = to_currency
+            commodity = last_tr.to_amount
+            commodity_in_other_currency = revolut_client.quote(
+                from_amount=commodity,
+                to_currency=from_currency
+            )
+            last_price = last_tr.from_amount
+            condition_price_with_margin = revolut_bot.get_amount_with_margin(
+                amount=last_price,
+                percent_margin=percent_margin
+            )
+            condition_met = commodity_in_other_currency.real_amount > \
+                condition_price_with_margin.real_amount
+        elif to_currency == main_currency:
+            logging.info(
+                f'Last transaction({last_tr.date.strftime(_DATETIME_FORMAT)}): '
+                f'Sold {last_tr.from_amount} '
+                f'for {last_tr.to_amount}'
+            )
+            action = 'buy'
+            currency = from_currency
+            percent_margin = -percent_margin
+            commodity = last_tr.from_amount
+            commodity_in_other_currency = revolut_client.quote(
+                from_amount=commodity,
+                to_currency=to_currency
+            )
+            last_price = last_tr.to_amount
+            condition_price_with_margin = revolut_bot.get_amount_with_margin(
+                amount=last_price,
+                percent_margin=percent_margin
+            )
+            condition_met = commodity_in_other_currency.real_amount > \
+                condition_price_with_margin.real_amount
+
         logging.info(
-            f'Now({datetime.now().strftime(_DATETIME_FORMAT)}): '
-            f'Your {current_balance} is worth {current_balance_in_other_currency}'
+            f'Looking to {action} {currency}'
         )
 
-        last_sell = last_tr.from_amount  # How much did it cost before selling
-        last_sell_plus_margin = revolut_bot.get_amount_with_margin(
-            amount=last_sell,
-            percent_margin=percent_margin
+        logging.info(
+            f'Currently({datetime.now().strftime(_DATETIME_FORMAT)}): '
+            f'{commodity} is worth {commodity_in_other_currency}'
         )
         logging.info(
-            f'Minimum value to sell yours {last_tr.to_amount.currency}: '
-            f'{last_sell} + {percent_margin}% '
-            f'of margin is {last_sell_plus_margin}'
+            f'Desired value to {action} {currency}: '
+            f'{last_price} with margin of {percent_margin}% '
+            f'is {condition_price_with_margin}'
         )
-        buy_condition = current_balance_in_other_currency.real_amount > \
-            last_sell_plus_margin.real_amount
 
         simulate_str = '| simulating' if simulate else ''
-        if buy_condition or forceexchange:
+        sign = '>' if action == 'buy' else '<'
+        if condition_met or forceexchange:
             if forceexchange:
                 logging.info('[ATTENTION] Force exchange option enabled')
             else:
                 logging.info(
                     f'Action: '
-                    f'{current_balance_in_other_currency} > {last_sell_plus_margin} '
-                    f'====> SELLING your {last_tr.to_amount.currency} {simulate_str}'
+                    f'{condition_price_with_margin} {sign} {commodity_in_other_currency} '
+                    f'====> {action.upper()}ING your {last_tr.to_amount.currency} {simulate_str}'
                 )
 
             if not simulate:
                 exchange_transaction = revolut_client.exchange(
-                    from_amount=current_balance,
-                    to_currency=previous_currency,
+                    from_amount=commodity,
+                    to_currency=from_currency,
                     simulate=simulate
                 )
                 logging.info(
@@ -122,8 +160,8 @@ def to_buy_or_not_to_buy(
         else:
             logging.info(
                 f'Action: '
-                f'{current_balance_in_other_currency} < {last_sell_plus_margin} '
-                f'====> NOT SELLING your {last_tr.to_amount.currency} {simulate_str}'
+                f'{commodity_in_other_currency} {sign} {condition_price_with_margin} '
+                f'====> NOT {action.upper()}ING {currency} {simulate_str}'
             )
         logging.info(f'Sleeping for {repeat_every_min} minutes\n\n')
         time.sleep(repeat_every_min*60)
