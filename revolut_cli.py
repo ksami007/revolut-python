@@ -1,11 +1,14 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import click
 from getpass import getpass
 import sys
 
-from revolut import Revolut, __version__, get_token_step1, get_token_step2
+from revolut import __version__
+from revolut import Revolut
+from revolut import get_token_step1
+from revolut import get_token_step2
+
 
 # Usage : revolut_cli.py --help
 
@@ -36,7 +39,7 @@ _CLI_DEVICE_ID = 'revolut_cli'
 )
 def main(token, language, account):
     """ Get the account balances on Revolut """
-    
+
     if token is None:
         print("You don't seem to have a Revolut token")
         answer = input("Would you like to generate a token [yes/no]? ")
@@ -88,6 +91,7 @@ def get_token():
           .format(token))
     return token
 
+
 def selection(user_input):
     yes_list = ["yes", "ye", "ya", "y", "yeah"]
     no_list = ["no", "nah", "nope", "n"]
@@ -102,12 +106,15 @@ def selection(user_input):
         print("Input not recognized, expecting 'yes' or 'no")
         sys.exit()
 
+
 def login_error_handler(error):
     error_list = {
-        "The string supplied did not seem to be a phone number" : \
-            "Please check the supplied number and try again.",
-        "Status code 401" : "Incorrect login details, please try again.",
-        "phone is empty" : "You did not enter a phone number..."
+        'The string supplied did not seem to be a phone number':
+        'Please check the supplied number and try again.',
+        'Status code 401':
+        'Incorrect login details, please try again.',
+        'phone is empty':
+        'You did not enter a phone number...'
     }
     error = str(error)
     for entry in error_list:
@@ -116,6 +123,7 @@ def login_error_handler(error):
             return
     print("An unknown error has occurred: {}".format(error))
     return
+
 
 if __name__ == "__main__":
     main()

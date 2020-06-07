@@ -104,7 +104,8 @@ venv.bak/
 .mypy_cache/
 
 # Specific for this project
-revolutbot_exchange_history.csv
+simulation_transaction_history.csv
+transaction_history.csv
 exchange_history.csv
 
 # VSCode

@@ -4,8 +4,11 @@ cli_device_id: 'revolut_cli'
 # Force the exchange, ignoring the bot decision (you may lose money)
 force_exchange: False
 
+# Path to where all data files are stored
+data_path: 'revolut_bot/data'
+
 # csv file with the exchange history
-history_file: 'revolutbot_exchange_history.csv'
+transaction_file: 'transaction_history.csv'
 
 # Generic python log level
 log_level: INFO
@@ -20,4 +23,7 @@ percent_margin: 1
 repeat_every_min: 15
 
 # Do the simulation instead of really exchanging your money
-simulate: True
+simulation:
+  enabled: True
+  # csv file with the simulation exchange history
+  transaction_file: 'simulation_transaction_history.csv'

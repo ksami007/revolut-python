@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import click
-import json
 import sys
 
 from datetime import datetime
 from datetime import timedelta
-from getpass import getpass
 
-from revolut import Revolut, __version__, get_token_step1, get_token_step2
+from revolut import Revolut
 
 
 _CLI_DEVICE_ID = 'revolut_cli'
@@ -49,6 +47,7 @@ def main(token, language, from_date, reverse):
     rev = Revolut(device_id=_CLI_DEVICE_ID, token=token)
     account_transactions = rev.get_account_transactions(from_date)
     print(account_transactions.csv(lang=language, reverse=reverse))
+
 
 if __name__ == "__main__":
     main()
