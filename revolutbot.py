@@ -96,7 +96,7 @@ def trade_commodity(
         #  to_currency = last_tr.to_amount.currency
 
         if lt_to.currency != main_currency and lt_from.currency == main_currency:
-            logging.info(
+            logging.debug(
                 f'Last transaction({last_transaction.date.strftime(_DATETIME_FORMAT)}): '
                 f'Bought {lt_to} '
                 f'for {lt_from}'
@@ -106,7 +106,7 @@ def trade_commodity(
             commodity = lt_to
             last_price = lt_from
         elif lt_to.currency == main_currency:
-            logging.info(
+            logging.debug(
                 f'Last transaction({last_transaction.date.strftime(_DATETIME_FORMAT)}): '
                 f'Sold {lt_from} '
                 f'for {lt_to}'
@@ -133,15 +133,15 @@ def trade_commodity(
             condition_met = commodity_in_main_currency.real_amount > \
                 condition_price_with_margin.real_amount
 
-        logging.info(
+        logging.debug(
             f'Looking to {action} {commodity.currency}'
         )
 
-        logging.info(
+        logging.debug(
             f'Currently({datetime.now().strftime(_DATETIME_FORMAT)}): '
             f'Same amount of {commodity.currency} is worth {commodity_in_main_currency}'
         )
-        logging.info(
+        logging.debug(
             f'Desired value to {action} same about of {commodity.currency}: '
             f'{last_price} with margin of {percent_margin}% '
             f'is {min_max_str} {condition_price_with_margin}'
@@ -154,7 +154,7 @@ def trade_commodity(
         if condition_met or forceexchange:
             if forceexchange:
                 logging.info('[ATTENTION] Force exchange option enabled')
-            logging.info(
+            logging.debug(
                 f'Action: '
                 f'{condition_price_with_margin} {sign} {commodity_in_main_currency} '
                 f'====> {action.upper()}ING {commodity.currency} {simulate_str}'
@@ -180,8 +180,11 @@ def trade_commodity(
                         date=datetime.now()
                     )
                 logging.info(
-                    f'Result: Just {action.upper()}ed {exchange_transaction.to_amount} '
-                    f'{simulate_str}\n'
+                    f'Just({datetime.now().strftime(_DATETIME_FORMAT)}) '
+                    f'{action.upper()}ED {exchange_transaction.to_amount} '
+                    f'{simulate_str}'
+                )
+                logging.debug(
                     f'Updating history file : {filename}'
                 )
                 revolut_bot.update_historyfile(
@@ -189,12 +192,12 @@ def trade_commodity(
                     exchange_transaction=exchange_transaction
                 )
         else:
-            logging.info(
+            logging.debug(
                 f'Action: '
                 f'{commodity_in_main_currency} {sign} {condition_price_with_margin} '
                 f'====> NOT {action.upper()}ING {commodity.currency} {simulate_str}'
             )
-        logging.info(f'Sleeping for {repeat_every_min} minutes\n\n')
+        logging.debug(f'Sleeping for {repeat_every_min} minutes\n\n')
         time.sleep(repeat_every_min*60)
 
 
