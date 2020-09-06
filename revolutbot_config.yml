@@ -1,0 +1,29 @@
+# Bot settings
+cli_device_id: 'revolut_cli'
+
+# Force the exchange, ignoring the bot decision (you may lose money)
+force_exchange: False
+
+# Path to where all data files are stored
+data_path: 'revolut_bot/data'
+
+# csv file with the exchange history
+transaction_file: 'transaction_history.csv'
+
+# Generic python log level
+log_level: INFO
+
+# Main currency
+main_currency: SEK
+
+# Min percent of benefit to exchange
+percent_margin: 1
+
+# Periodicity how often to run the bot
+repeat_every_min: 15
+
+# Do the simulation instead of really exchanging your money
+simulation:
+  enabled: True
+  # csv file with the simulation exchange history
+  transaction_file: 'simulation_transaction_history.csv'

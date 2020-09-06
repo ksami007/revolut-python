@@ -4,10 +4,10 @@
 import click
 import json
 import os
+import sys
 
 from datetime import datetime
 from datetime import timedelta
-
 from revolut import Revolut, __version__
 
 
@@ -66,6 +66,7 @@ def main(device_id, token, language, from_date, output_format, reverse):
     else:
         print("output format {!r} not implemented".format(output_format))
         exit(1)
+
 
 
 if __name__ == "__main__":

@@ -1,139 +1,204 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import click
-from revolut import Revolut, __version__
+from datetime import datetime
+
 import revolut_bot
-import sys
+import yaml
+import logging
+import os
+import time
 
-# Usage : revolutbot.py --help
-
-_BOT_PERCENT_MARGIN = 1  # at least 1% benefit to exchange
-_VERBOSE_MODE = False  # can be changed with --verbose parameter
-
-_RETURN_CODE_BUY = 0
-_RETURN_CODE_DO_NOT_BUY = 1
-_RETURN_CODE_ERROR = 2
+from revolut import Revolut
+from revolut import Transaction
+from revolut import _DATETIME_FORMAT
 
 
-@click.command()
-@click.option(
-    '--device-id', '-d',
-    envvar="REVOLUT_DEVICE_ID",
-    type=str,
-    help='your Revolut token (or set the env var REVOLUT_DEVICE_ID)',
-    default='revolut_cli',
-)
-@click.option(
-    '--token', '-t',
-    envvar="REVOLUT_TOKEN",
-    type=str,
-    help='your Revolut token (or set the env var REVOLUT_TOKEN)',
-)
-@click.option(
-    '--historyfile', '-f',
-    type=str,
-    help='csv file with the exchange history',
-    required=True,
-)
-@click.option(
-    '--forceexchange',
-    is_flag=True,
-    help='force the exchange, ignoring the bot decision (you may lose money)',
-)
-@click.option(
-    '--simulate', '-s',
-    is_flag=True,
-    help='do not really exchange your money if set',
-)
-@click.option(
-    '--verbose', '-v',
-    is_flag=True,
-    help='verbose mode',
-)
-@click.version_option(
-    version=__version__,
-    message='%(prog)s, based on [revolut] package version %(version)s'
-)
-def main(device_id, token, simulate, historyfile, verbose, forceexchange):
-    if token is None:
-        print("You don't seem to have a Revolut token")
-        print("Please execute revolut_cli.py first to get one")
-        sys.exit(_RETURN_CODE_ERROR)
-
-    global _VERBOSE_MODE
-    _VERBOSE_MODE = verbose
-    rev = Revolut(device_id=device_id, token=token)
-
-    to_buy_or_not_to_buy(revolut=rev,
-                         simulate=simulate,
-                         filename=historyfile,
-                         forceexchange=forceexchange)
+CONFIG_FILE = 'revolutbot_config.yml'
 
 
-def log(log_str=""):
-    if _VERBOSE_MODE:
-        print(log_str)
+def main():
+    token = os.environ.get('REVOLUT_TOKEN')
+    if not token:
+        logging.error(
+            'You don\'t seem to have a Revolut token. '
+            'Please execute revolut_cli.py first to get one'
+        )
+        raise RuntimeError('No token were found in environmental variables')
 
+    with open(CONFIG_FILE, 'r') as config_file:
+        config = yaml.load(config_file, Loader=yaml.FullLoader)
 
-def to_buy_or_not_to_buy(revolut, simulate, filename, forceexchange):
-    percent_margin = _BOT_PERCENT_MARGIN
+    # Set logging level
+    logging.basicConfig(
+        level=config.get('log_level', 'INFO'),
+        format='%(levelname)s - %(message)s'
+    )
 
-    last_transactions = revolut_bot.get_last_transactions_from_csv(
-                        filename=filename)
-    last_tr = last_transactions[-1]  # The last transaction
-    log()
-    log("Last transaction : {}\n".format(last_tr))
-    previous_currency = last_tr.from_amount.currency
+    revolut_client = Revolut(device_id=config['cli_device_id'], token=token)
 
-    current_balance = last_tr.to_amount  # How much we currently have
-
-    current_balance_in_other_currency = revolut.quote(
-                                from_amount=current_balance,
-                                to_currency=previous_currency)
-    log("Today : {} in {} : {}\n".format(
-        current_balance, previous_currency, current_balance_in_other_currency))
-
-    last_sell = last_tr.from_amount  # How much did it cost before selling
-
-    last_sell_plus_margin = revolut_bot.get_amount_with_margin(
-                                    amount=last_sell,
-                                    percent_margin=percent_margin)
-    log("Min value to buy : {} + {}% (margin) = {}\n".format(
-        last_sell,
+    simulation = config['simulation']['enabled']
+    data_path = config['data_path']
+    transaction_filename = os.path.join(*[data_path, config['transaction_file']])
+    sm_transaction_filename = None
+    if config['simulation'].get('transaction_file'):
+        sm_transaction_filename = os.path.join(
+            *[data_path, config['simulation']['transaction_file']]
+        )
+    forceexchange = config['force_exchange']
+    main_currency = config['main_currency']
+    percent_margin = config['percent_margin']
+    repeat_every_min = config['repeat_every_min']
+    trade_commodity(
+        revolut_client,
+        transaction_filename,
+        simulation,
+        sm_transaction_filename,
+        main_currency,
+        forceexchange,
         percent_margin,
-        last_sell_plus_margin))
+        repeat_every_min
+    )
 
-    buy_condition = current_balance_in_other_currency.real_amount > \
-        last_sell_plus_margin.real_amount
 
-    if buy_condition or forceexchange:
-        if buy_condition:
-            log("{} > {}".format(
-                current_balance_in_other_currency,
-                last_sell_plus_margin))
-        elif forceexchange:
-            log("/!\\ Force exchange option enabled")
-        log("=> BUY")
+def trade_commodity(
+    revolut_client,
+    transaction_filename,
+    simulation,
+    sm_transaction_filename,
+    main_currency,
+    forceexchange,
+    percent_margin,
+    repeat_every_min
+):
+    """
+    Continuously monitor the commodity price
+    Two possible scenarios:
+    If during last transaction you have sold commodity - monitor for cheaper offer to buy more;
+    If during last transaction you bought commodity - monitor for higher offer to sell it.
+    """
 
-        if simulate:
-            log("(Simulation mode : do not really buy)")
+    while True:
+        # If simulation mode enables and simulation file provided
+        # Write/read all transactions from that file
+        if simulation and sm_transaction_filename:
+            filename = sm_transaction_filename
+        elif simulation is False:
+            filename = transaction_filename
+
+        last_transaction = revolut_bot.get_last_transactions_from_csv(
+            filename=filename
+        )[-1]  # Get the last transaction from the list
+
+        # For example: USD(from) to BTC(to)
+        lt_from = last_transaction.from_amount
+        lt_to = last_transaction.to_amount
+
+        #  from_currency = last_tr.from_amount.currency
+        #  to_currency = last_tr.to_amount.currency
+
+        if lt_to.currency != main_currency and lt_from.currency == main_currency:
+            logging.debug(
+                f'Last transaction({last_transaction.date.strftime(_DATETIME_FORMAT)}): '
+                f'Bought {lt_to} '
+                f'for {lt_from}'
+            )
+            action = 'sell'
+            min_max_str = 'minimum'
+            commodity = lt_to
+            last_price = lt_from
+        elif lt_to.currency == main_currency:
+            logging.debug(
+                f'Last transaction({last_transaction.date.strftime(_DATETIME_FORMAT)}): '
+                f'Sold {lt_from} '
+                f'for {lt_to}'
+            )
+            action = 'buy'
+            min_max_str = 'maximum'
+            percent_margin = -percent_margin
+            commodity = lt_from
+            last_price = lt_to
+
+        condition_price_with_margin = revolut_bot.get_amount_with_margin(
+            amount=last_price,
+            percent_margin=percent_margin
+        )
+        commodity_in_main_currency = revolut_client.quote(
+            from_amount=commodity,
+            to_currency=main_currency
+        )
+
+        if action == 'buy':
+            condition_met = commodity_in_main_currency.real_amount < \
+                condition_price_with_margin.real_amount
+        elif action == 'sell':
+            condition_met = commodity_in_main_currency.real_amount > \
+                condition_price_with_margin.real_amount
+
+        logging.debug(
+            f'Looking to {action} {commodity.currency}'
+        )
+
+        logging.debug(
+            f'Currently({datetime.now().strftime(_DATETIME_FORMAT)}): '
+            f'Same amount of {commodity.currency} is worth {commodity_in_main_currency}'
+        )
+        logging.debug(
+            f'Desired value to {action} same about of {commodity.currency}: '
+            f'{last_price} with margin of {percent_margin}% '
+            f'is {min_max_str} {condition_price_with_margin}'
+        )
+        logging.debug(f'CONDITION MET - {condition_met}')
+
+        simulate_str = '| simulating' if simulation else ''
+        sign = '>' if action == 'buy' else '<'
+        #  condition_met = True # TODO: REMOVE!
+        if condition_met or forceexchange:
+            if forceexchange:
+                logging.info('[ATTENTION] Force exchange option enabled')
+            logging.debug(
+                f'Action: '
+                f'{condition_price_with_margin} {sign} {commodity_in_main_currency} '
+                f'====> {action.upper()}ING {commodity.currency} {simulate_str}'
+            )
+
+            if forceexchange or simulation is False or (simulation and sm_transaction_filename):
+                # TODO rewrite to return a real object for simulation
+                if forceexchange and simulation is False:
+                    # Real transaction
+                    exchange_transaction = revolut_client.exchange(
+                        from_amount=commodity,
+                        to_currency=lt_from.currency
+                    )
+                else:
+                    # Simulation transaction
+                    exchanged_amount = revolut_client.quote(
+                        from_amount=condition_price_with_margin,
+                        to_currency=commodity.currency
+                    )
+                    exchange_transaction = Transaction(
+                        from_amount=condition_price_with_margin,
+                        to_amount=exchanged_amount,
+                        date=datetime.now()
+                    )
+                logging.info(
+                    f'Just({datetime.now().strftime(_DATETIME_FORMAT)}) '
+                    f'{action.upper()}ED {exchange_transaction.to_amount} '
+                    f'{simulate_str}'
+                )
+                logging.debug(
+                    f'Updating history file : {filename}'
+                )
+                revolut_bot.update_historyfile(
+                    filename=filename,
+                    exchange_transaction=exchange_transaction
+                )
         else:
-            exchange_transaction = revolut.exchange(
-                            from_amount=current_balance,
-                            to_currency=previous_currency,
-                            simulate=simulate)
-            log("{} bought".format(exchange_transaction.to_amount.real_amount))
-            log("Update history file : {}".format(filename))
-            revolut_bot.update_historyfile(
-                                    filename=filename,
-                                    exchange_transaction=exchange_transaction)
-        sys.exit(_RETURN_CODE_BUY)
-    else:
-        log("{} < {}".format(
-            current_balance_in_other_currency,
-            last_sell_plus_margin))
-        log("=> DO NOT BUY")
-        sys.exit(_RETURN_CODE_DO_NOT_BUY)
+            logging.debug(
+                f'Action: '
+                f'{commodity_in_main_currency} {sign} {condition_price_with_margin} '
+                f'====> NOT {action.upper()}ING {commodity.currency} {simulate_str}'
+            )
+        logging.debug(f'Sleeping for {repeat_every_min} minutes\n\n')
+        time.sleep(repeat_every_min*60)
 
 
 if __name__ == "__main__":
